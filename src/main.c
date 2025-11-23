@@ -28,6 +28,34 @@ const double piReference = 3.141592653589793238;
 EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
 
+int checkPiDigits(double calculatedPi, double referencePi) {
+    char calcStr[32];
+    char refStr[32];
+    
+    sprintf(calcStr, "%.15f", calculatedPi);
+    sprintf(refStr, "%.15f", referencePi);
+    
+    int matchingDigits = 0;
+    bool afterDecimal = false;
+    
+    for(int i = 0; calcStr[i] != '\0' && refStr[i] != '\0'; i++) {
+        if(calcStr[i] == '.') {
+            afterDecimal = true;
+            continue;
+        }
+        
+        if(afterDecimal) {
+            if(calcStr[i] == refStr[i]) {
+                matchingDigits++;
+            } else {
+                break;
+            }
+        }
+    }
+    
+    return matchingDigits;
+}
+
 void controlTask(void* param) {
     piResult_t lebnizResult;
     uint16_t xpos = 20;
@@ -36,20 +64,22 @@ void controlTask(void* param) {
     char displayTicks[24];
     char displayIterations[24];
     char displayTime[24];
+    char displayMathingDigits[24];
 	uint16_t color = WHITE;
     for(;;) {
         if(xQueueReceive(leibnizQueue, &lebnizResult, portMAX_DELAY) == pdTRUE) {
-            xQueueReset(leibnizQueue);
             sprintf((char*)displayPi, "Pi = %f", lebnizResult.piValue);
             sprintf((char*)displayTicks, "Ticks = %d", (int)lebnizResult.tickCount);
             sprintf((char*)displayIterations, "Iterations = %d", (int)lebnizResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(lebnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
+            sprintf((char*)displayTime, "matchingDigits = %d", checkPiDigits(lebnizResult.piValue, piReference));
             lcdFillScreen(BLACK);
             lcdDrawString(fx32L, xpos, ypos, &displayPi[0], color);
             lcdDrawString(fx32L, xpos, ypos+50, &displayTicks[0], color);
             lcdDrawString(fx32L, xpos, ypos+100, &displayIterations[0], color);
             lcdDrawString(fx32L, xpos, ypos+150, &displayTime[0], color);
             lcdUpdateVScreen();
+            xQueueReset(leibnizQueue);
         }
         vTaskDelay(50/portTICK_PERIOD_MS);
     }
@@ -78,7 +108,11 @@ void leibnizTask(void* param) {
         piResult.piValue = sum * 4.0;
         piResult.iterations = iterator;
         xQueueSendToFront(leibnizQueue, &piResult, 0);
-        taskYIELD();
+        if(iterator % 1000 == 0) {
+            vTaskDelay(1);
+        } else {
+            taskYIELD();
+        }
     }
 }
 
