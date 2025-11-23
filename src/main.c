@@ -72,12 +72,13 @@ void controlTask(void* param) {
             sprintf((char*)displayTicks, "Ticks = %d", (int)lebnizResult.tickCount);
             sprintf((char*)displayIterations, "Iterations = %d", (int)lebnizResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(lebnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-            sprintf((char*)displayTime, "matchingDigits = %d", checkPiDigits(lebnizResult.piValue, piReference));
+            sprintf((char*)displayMathingDigits, "matchingDigits = %d", checkPiDigits(lebnizResult.piValue, piReference));
             lcdFillScreen(BLACK);
             lcdDrawString(fx32L, xpos, ypos, &displayPi[0], color);
             lcdDrawString(fx32L, xpos, ypos+50, &displayTicks[0], color);
             lcdDrawString(fx32L, xpos, ypos+100, &displayIterations[0], color);
             lcdDrawString(fx32L, xpos, ypos+150, &displayTime[0], color);
+            lcdDrawString(fx32L, xpos, ypos+200, &displayMathingDigits[0], color);
             lcdUpdateVScreen();
             xQueueReset(leibnizQueue);
         }
