@@ -27,6 +27,7 @@ const double piReference = 3.141592653589793238;
 
 EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
+QueueHandle_t chudnovskyQueue;
 
 int checkPiDigits__(double calculatedPi, double referencePi) {
     char calcStr[32];
@@ -89,43 +90,49 @@ void drawColoredPi__(const FontxFile *font, uint16_t x, uint16_t y, double calcu
 
 void controlTask(void* param) {
     piResult_t leibnizResult;
+    piResult_t chudnovskyResult;
     uint16_t xpos = 20;
 	uint16_t ypos = 50;
-	//char displayPi[24];
     char displayTicks[24];
     char displayIterations[24];
     char displayTime[24];
     char displayMathingDigits[24];
 	uint16_t color = WHITE;
     for(;;) {
+        lcdFillScreen(BLACK);
         if(xQueueReceive(leibnizQueue, &leibnizResult, portMAX_DELAY) == pdTRUE) {
-            //sprintf((char*)displayPi, "Pi = %.10f", leibnizResult.piValue);
             sprintf((char*)displayTicks, "Ticks = %d", (int)leibnizResult.tickCount);
             sprintf((char*)displayIterations, "Passes = %d", (int)leibnizResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(leibnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
             sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(leibnizResult.piValue, piReference));
-            lcdFillScreen(BLACK);
+
             lcdDrawString(fx32G, xpos, ypos, "Leibniz", color);
             drawColoredPi__(fx24G, xpos, ypos+50, leibnizResult.piValue, piReference);
-            //lcdDrawString(fx24G, xpos, ypos+50, &displayPi[0], color);
             lcdDrawString(fx24G, xpos, ypos+100, &displayTicks[0], color);
             lcdDrawString(fx24G, xpos, ypos+150, &displayIterations[0], color);
             lcdDrawString(fx24G, xpos, ypos+200, &displayTime[0], color);
             lcdDrawString(fx24G, xpos, ypos+250, &displayMathingDigits[0], color);
             lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, BLUE);
 
-            lcdDrawString(fx32G, xpos+230, ypos, "Placeholder", color);
-            drawColoredPi__(fx24G, xpos+230, ypos+50, leibnizResult.piValue, piReference);
-            //lcdDrawString(fx24G, xpos+230, ypos+50, &displayPi[0], color);
+            xQueueReset(leibnizQueue);
+        }
+        if(xQueueReceive(chudnovskyQueue, &chudnovskyResult, portMAX_DELAY) == pdTRUE) {
+            sprintf((char*)displayTicks, "Ticks = %d", (int)chudnovskyResult.tickCount);
+            sprintf((char*)displayIterations, "Passes = %d", (int)chudnovskyResult.iterations);
+            sprintf((char*)displayTime, "Time = %.3fs", ((float)(chudnovskyResult.tickCount * portTICK_PERIOD_MS)) / 1000);
+            sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(chudnovskyResult.piValue, piReference));
+
+            lcdDrawString(fx32G, xpos+230, ypos, "Chudnovsky", color);
+            drawColoredPi__(fx24G, xpos+230, ypos+50, chudnovskyResult.piValue, piReference);
             lcdDrawString(fx24G, xpos+230, ypos+100, &displayTicks[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+150, &displayIterations[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+200, &displayTime[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+250, &displayMathingDigits[0], color);
             lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, BLUE);
 
-            lcdUpdateVScreen();
-            xQueueReset(leibnizQueue);
+            xQueueReset(chudnovskyQueue);
         }
+        lcdUpdateVScreen();
         vTaskDelay(10/portTICK_PERIOD_MS);
     }
 }
@@ -150,7 +157,51 @@ void leibnizTask(void* param) {
         piResult.piValue = sum * 4.0;
         piResult.iterations = iterator;
         xQueueSendToFront(leibnizQueue, &piResult, 0);
-        if(iterator % 1000 == 0) {
+        if(iterator % 500 == 0) {
+            vTaskDelay(1);
+        } else {
+            taskYIELD();
+        }
+    }
+}
+
+void chudnovskyTask(void* param) {
+    piResult_t piResult;
+    
+    uint32_t k = 0;
+    long double sum = 0;
+    long double K = 6.0L;
+    long double M = 1.0L;
+    long double X = 1.0L;
+    long double L = 13591409.0L;
+    long double S = 13591409.0L;
+    
+    vTaskDelay(100);
+    
+    const long double C = 426880.0L * sqrtl(10005.0L);
+    const uint32_t MAX_ITERATIONS = 2;  //hard fix to make double not overflow
+    
+    for(;;) {
+        if(k > 0 && k <= MAX_ITERATIONS) {
+            K += 12.0L;
+            M = M * (K*K*K - 16.0L*K) / ((k+1)*(k+1)*(k+1));
+            L += 545140134.0L;
+            X *= -262537412640768000.0L;
+            S += M * L / X;
+        }
+        
+        piResult.tickCount = xTaskGetTickCount();
+        piResult.piValue = (double)(C / S);
+        piResult.iterations = k + 1;
+        printf("pi = %0.10f\n", piResult.piValue);
+        xQueueSendToFront(chudnovskyQueue, &piResult, 0);
+        
+        k++;
+        
+        // Stop after reaching double precision limit
+        if(k > MAX_ITERATIONS) {
+            vTaskDelay(100);  // Just update display periodically
+        } else if(k % 10 == 0) {
             vTaskDelay(1);
         } else {
             taskYIELD();
@@ -165,10 +216,12 @@ void app_main()
 
     piCalcEventGroup = xEventGroupCreate();
     leibnizQueue = xQueueCreate(100, sizeof(piResult_t));
+    chudnovskyQueue = xQueueCreate(100, sizeof(piResult_t));
     
     //Create templateTask
     xTaskCreatePinnedToCore(controlTask, "controlTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(chudnovskyTask, "chudnovskyTask", 2*2048, NULL, 1, NULL, 1);
 
     return;
 }
