@@ -20,7 +20,10 @@
 typedef struct {
     double     piValue;
     TickType_t tickCount;
+    uint32_t   iterations;
 } piResult_t;
+
+const double piReference = 3.141592653589793238;
 
 EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
@@ -31,18 +34,21 @@ void controlTask(void* param) {
 	uint16_t ypos = 50;
 	char displayPi[24];
     char displayTicks[24];
+    char displayIterations[24];
     char displayTime[24];
-	uint16_t color = GREEN;
+	uint16_t color = WHITE;
     for(;;) {
         if(xQueueReceive(leibnizQueue, &lebnizResult, portMAX_DELAY) == pdTRUE) {
             xQueueReset(leibnizQueue);
             sprintf((char*)displayPi, "Pi = %f", lebnizResult.piValue);
             sprintf((char*)displayTicks, "Ticks = %d", (int)lebnizResult.tickCount);
+            sprintf((char*)displayIterations, "Iterations = %d", (int)lebnizResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(lebnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
             lcdFillScreen(BLACK);
             lcdDrawString(fx32L, xpos, ypos, &displayPi[0], color);
             lcdDrawString(fx32L, xpos, ypos+50, &displayTicks[0], color);
-            lcdDrawString(fx32L, xpos, ypos+100, &displayTime[0], color);
+            lcdDrawString(fx32L, xpos, ypos+100, &displayIterations[0], color);
+            lcdDrawString(fx32L, xpos, ypos+150, &displayTime[0], color);
             lcdUpdateVScreen();
         }
         vTaskDelay(50/portTICK_PERIOD_MS);
@@ -51,15 +57,28 @@ void controlTask(void* param) {
 
 void leibnizTask(void* param) {
     piResult_t piResult;
-    piResult.piValue = 0;
+    
+    uint32_t iterator = 0;
+    double sum = 0;
+    double divisionValue = 0;
     vTaskDelay(100);
 
     for(;;) {
+        divisionValue = 1.0 / (((double)iterator * 2.0) + 1.0);
+        if(iterator % 2) {
+            sum -= divisionValue;
+            printf("pi = pi - %f\n", divisionValue);
+        } else {
+            sum += divisionValue;
+            printf("pi = pi + %f\n", divisionValue);
+        }
+        printf("iterator = %ld\n", iterator);
+        iterator++;
         piResult.tickCount = xTaskGetTickCount();
-        piResult.piValue++;
+        piResult.piValue = sum * 4.0;
+        piResult.iterations = iterator;
         xQueueSendToFront(leibnizQueue, &piResult, 0);
-
-        taskYIELD();  // Yield to allow IDLE task brief execution
+        taskYIELD();
     }
 }
 
