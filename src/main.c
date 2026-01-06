@@ -192,18 +192,35 @@ void controlTask(void* param) {
             xEventGroupClearBits(piCalcEventGroup, LEIBNIZ_START | EULER_START  | RACE_START | RESET);
             led_set(LED0, 0);
             led_set(LED1, 0);
-            if(leibnizTaskHandle != NULL && eTaskGetState(leibnizTaskHandle) != eSuspended) {
-                vTaskSuspend(leibnizTaskHandle);
+            
+            // Delete and recreate tasks to fully reset their internal state
+            if(leibnizTaskHandle != NULL) {
+                vTaskDelete(leibnizTaskHandle);
+                leibnizTaskHandle = NULL;
             }
-            if(eulerTaskHandle != NULL && eTaskGetState(eulerTaskHandle) != eSuspended) {
-                vTaskSuspend(eulerTaskHandle);
+            if(eulerTaskHandle != NULL) {
+                vTaskDelete(eulerTaskHandle);
+                eulerTaskHandle = NULL;
             }
+            
+            // Clear queues
+            xQueueReset(leibnizQueue);
+            xQueueReset(eulerQueue);
+            
+            // Recreate tasks in suspended state
+            xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, &leibnizTaskHandle, 1);
+            xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, &eulerTaskHandle, 1);
+            vTaskSuspend(leibnizTaskHandle);
+            vTaskSuspend(eulerTaskHandle);
+            
             leibnizResult.iterations = 0;
             leibnizResult.piValue = 0.0;
             leibnizResult.tickCount = 0;
+            leibnizDigits = 0;
             eulerResult.iterations = 0;
             eulerResult.piValue = 0.0;
             eulerResult.tickCount = 0;
+            eulerDigits = 0;
         }
 
         eventBitsLast = eventBits;
