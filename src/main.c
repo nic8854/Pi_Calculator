@@ -39,6 +39,10 @@ EventGroupHandle_t piCalcEventGroup;
 #define RACE_START          (1 << 2)  // bit 2
 #define RESET               (1 << 5)  // bit 5
 
+// Forward declarations
+void leibnizTask(void* param);
+void eulerTask(void* param);
+
 int checkPiDigits__(double calculatedPi, double referencePi) {
     char calcStr[32];
     char refStr[32];
