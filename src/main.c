@@ -211,6 +211,7 @@ void leibnizTask(void* param) {
     double sum = 0;
     double divisionValue = 0;
     vTaskDelay(100);
+    TickType_t startTick = xTaskGetTickCount();
     for(;;) {
         divisionValue = 1.0 / (((double)iterator * 2.0) + 1.0);
         if(iterator % 2) {
@@ -219,7 +220,7 @@ void leibnizTask(void* param) {
             sum += divisionValue;
         }
         iterator++;
-        piResult.tickCount = xTaskGetTickCount();
+        piResult.tickCount = xTaskGetTickCount() - startTick;
         piResult.piValue = sum * 4.0;
         piResult.iterations = iterator;
         xQueueSendToFront(leibnizQueue, &piResult, 0);
@@ -238,11 +239,12 @@ void eulerTask(void* param) {
     double sum = 0;
     
     vTaskDelay(100);
+    TickType_t startTick = xTaskGetTickCount();
     
     for(;;) {
         sum += 1.0 / ((double)n * (double)n);
         
-        piResult.tickCount = xTaskGetTickCount();
+        piResult.tickCount = xTaskGetTickCount() - startTick;
         piResult.piValue = sqrt(6.0 * sum);
         piResult.iterations = n;
         xQueueSendToFront(eulerQueue, &piResult, 0);
