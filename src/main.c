@@ -30,6 +30,9 @@ uint8_t digitTarget = 6;
 QueueHandle_t leibnizQueue;
 QueueHandle_t eulerQueue;
 
+TaskHandle_t leibnizTaskHandle = NULL;
+TaskHandle_t eulerTaskHandle = NULL;
+
 EventGroupHandle_t piCalcEventGroup;
 #define LEIBNIZ_START      (1 << 0)  // bit 0
 #define EULER_START         (1 << 1)  // bit 1
@@ -149,6 +152,7 @@ void controlTask(void* param) {
     eulerResult.piValue = 0.0;
     eulerResult.tickCount = 0;
     EventBits_t eventBits;
+    EventBits_t eventBitsLast = 0;
     uint16_t xpos = 20;
 	uint16_t ypos = 50;
     char displayTicksLeibniz[24];
@@ -162,20 +166,38 @@ void controlTask(void* param) {
 	uint16_t color = WHITE;
     for(;;) {
         eventBits = xEventGroupGetBits(piCalcEventGroup);
-        if(eventBits & LEIBNIZ_START) {
+        if(eventBits & LEIBNIZ_START && !(eventBitsLast & LEIBNIZ_START)) {
             led_set(LED0, 1);
+            if(leibnizTaskHandle != NULL && eTaskGetState(leibnizTaskHandle) == eSuspended) {
+                vTaskResume(leibnizTaskHandle);
+            }
         }
-        if(eventBits & EULER_START) {
+        if(eventBits & EULER_START && !(eventBitsLast & EULER_START)) {
             led_set(LED1, 1);
+            if(eulerTaskHandle != NULL && eTaskGetState(eulerTaskHandle) == eSuspended) {
+                vTaskResume(eulerTaskHandle);
+            }
         }
-        if(eventBits & RACE_START) {
+        if(eventBits & RACE_START && !(eventBitsLast & RACE_START)) {
             led_set(LED0, 1);
             led_set(LED1, 1);
+            if(leibnizTaskHandle != NULL && eTaskGetState(leibnizTaskHandle) == eSuspended) {
+                vTaskResume(leibnizTaskHandle);
+            }
+            if(eulerTaskHandle != NULL && eTaskGetState(eulerTaskHandle) == eSuspended) {
+                vTaskResume(eulerTaskHandle);
+            }
         }
-        if(eventBits & RESET) {
+        if(eventBits & RESET && !(eventBitsLast & RESET)) {
             xEventGroupClearBits(piCalcEventGroup, LEIBNIZ_START | EULER_START  | RACE_START | RESET);
             led_set(LED0, 0);
             led_set(LED1, 0);
+            if(leibnizTaskHandle != NULL && eTaskGetState(leibnizTaskHandle) != eSuspended) {
+                vTaskSuspend(leibnizTaskHandle);
+            }
+            if(eulerTaskHandle != NULL && eTaskGetState(eulerTaskHandle) != eSuspended) {
+                vTaskSuspend(eulerTaskHandle);
+            }
             leibnizResult.iterations = 0;
             leibnizResult.piValue = 0.0;
             leibnizResult.tickCount = 0;
@@ -184,24 +206,33 @@ void controlTask(void* param) {
             eulerResult.tickCount = 0;
         }
 
-        lcdFillScreen(BLACK);
+        eventBitsLast = eventBits;
+
         if(leibnizDigits < digitTarget) {
-            if(xQueueReceive(leibnizQueue, &leibnizResult, portMAX_DELAY) == pdTRUE) {
+            if(xQueueReceive(leibnizQueue, &leibnizResult, 0) == pdTRUE) {
                 xQueueReset(leibnizQueue);
                 leibnizDigits = checkPiDigits__(leibnizResult.piValue, piReference);
             }
         } else {
             led_set(LED0, 0);
+            if(leibnizTaskHandle != NULL && eTaskGetState(leibnizTaskHandle) != eSuspended) {
+                vTaskSuspend(leibnizTaskHandle);
+            }
         }
         
         if(eulerDigits < digitTarget) {
-            if(xQueueReceive(eulerQueue, &eulerResult, portMAX_DELAY) == pdTRUE) {
+            if(xQueueReceive(eulerQueue, &eulerResult, 0) == pdTRUE) {
                 xQueueReset(eulerQueue);
                 eulerDigits = checkPiDigits__(eulerResult.piValue, piReference);
             }
         } else {
             led_set(LED1, 0);
+            if(eulerTaskHandle != NULL && eTaskGetState(eulerTaskHandle) != eSuspended) {
+                vTaskSuspend(eulerTaskHandle);
+            }
         }
+
+        lcdFillScreen(BLACK);
 
         sprintf((char*)displayTicksLeibniz, "Ticks = %d", (int)leibnizResult.tickCount);
         sprintf((char*)displayIterationsLeibniz, "Passes = %d", (int)leibnizResult.iterations);
@@ -231,7 +262,7 @@ void controlTask(void* param) {
 
             
         lcdUpdateVScreen();
-        vTaskDelay(10/portTICK_PERIOD_MS);
+        vTaskDelay(50/portTICK_PERIOD_MS);
     }
 }
 
@@ -302,8 +333,12 @@ void app_main()
     //Create templateTask
     xTaskCreatePinnedToCore(inputTask, "inputTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(controlTask, "controlTask", 2*2048, NULL, 10, NULL, 0);
-    //xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
-    //xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, &leibnizTaskHandle, 1);
+    xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, &eulerTaskHandle, 1);
+    
+    // Initially suspend both calculation tasks
+    vTaskSuspend(leibnizTaskHandle);
+    vTaskSuspend(eulerTaskHandle);
 
     return;
 }
