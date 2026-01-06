@@ -139,10 +139,12 @@ void inputTask(void* param) {
 
 void controlTask(void* param) {
     piResult_t leibnizResult;
+    uint8_t leibnizDigits = 0;
     leibnizResult.iterations = 0;
     leibnizResult.piValue = 0.0;
     leibnizResult.tickCount = 0;
     piResult_t eulerResult;
+    uint8_t eulerDigits = 0;
     eulerResult.iterations = 0;
     eulerResult.piValue = 0.0;
     eulerResult.tickCount = 0;
@@ -174,15 +176,31 @@ void controlTask(void* param) {
             xEventGroupClearBits(piCalcEventGroup, LEIBNIZ_START | EULER_START  | RACE_START | RESET);
             led_set(LED0, 0);
             led_set(LED1, 0);
-            led_set(LED2, 0);
+            leibnizResult.iterations = 0;
+            leibnizResult.piValue = 0.0;
+            leibnizResult.tickCount = 0;
+            eulerResult.iterations = 0;
+            eulerResult.piValue = 0.0;
+            eulerResult.tickCount = 0;
         }
 
         lcdFillScreen(BLACK);
-        if(xQueueReceive(leibnizQueue, &leibnizResult, portMAX_DELAY) == pdTRUE) {
-            xQueueReset(leibnizQueue);
+        if(leibnizDigits < digitTarget) {
+            if(xQueueReceive(leibnizQueue, &leibnizResult, portMAX_DELAY) == pdTRUE) {
+                xQueueReset(leibnizQueue);
+                leibnizDigits = checkPiDigits__(leibnizResult.piValue, piReference);
+            }
+        } else {
+            led_set(LED0, 0);
         }
-        if(xQueueReceive(eulerQueue, &eulerResult, portMAX_DELAY) == pdTRUE) {
-            xQueueReset(eulerQueue);
+        
+        if(eulerDigits < digitTarget) {
+            if(xQueueReceive(eulerQueue, &eulerResult, portMAX_DELAY) == pdTRUE) {
+                xQueueReset(eulerQueue);
+                eulerDigits = checkPiDigits__(eulerResult.piValue, piReference);
+            }
+        } else {
+            led_set(LED1, 0);
         }
 
         sprintf((char*)displayTicksLeibniz, "Ticks = %d", (int)leibnizResult.tickCount);
@@ -284,8 +302,8 @@ void app_main()
     //Create templateTask
     xTaskCreatePinnedToCore(inputTask, "inputTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(controlTask, "controlTask", 2*2048, NULL, 10, NULL, 0);
-    xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, NULL, 1);
+    //xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
+    //xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, NULL, 1);
 
     return;
 }
