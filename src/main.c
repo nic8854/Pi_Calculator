@@ -27,7 +27,7 @@ const double piReference = 3.141592653589793238;
 
 EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
-QueueHandle_t chudnovskyQueue;
+QueueHandle_t eulerQueue;
 
 int checkPiDigits__(double calculatedPi, double referencePi) {
     char calcStr[32];
@@ -90,7 +90,7 @@ void drawColoredPi__(const FontxFile *font, uint16_t x, uint16_t y, double calcu
 
 void controlTask(void* param) {
     piResult_t leibnizResult;
-    piResult_t chudnovskyResult;
+    piResult_t eulerResult;
     uint16_t xpos = 20;
 	uint16_t ypos = 50;
     char displayTicks[24];
@@ -116,21 +116,21 @@ void controlTask(void* param) {
 
             xQueueReset(leibnizQueue);
         }
-        if(xQueueReceive(chudnovskyQueue, &chudnovskyResult, portMAX_DELAY) == pdTRUE) {
-            sprintf((char*)displayTicks, "Ticks = %d", (int)chudnovskyResult.tickCount);
-            sprintf((char*)displayIterations, "Passes = %d", (int)chudnovskyResult.iterations);
-            sprintf((char*)displayTime, "Time = %.3fs", ((float)(chudnovskyResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-            sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(chudnovskyResult.piValue, piReference));
+        if(xQueueReceive(eulerQueue, &eulerResult, portMAX_DELAY) == pdTRUE) {
+            sprintf((char*)displayTicks, "Ticks = %d", (int)eulerResult.tickCount);
+            sprintf((char*)displayIterations, "Passes = %d", (int)eulerResult.iterations);
+            sprintf((char*)displayTime, "Time = %.3fs", ((float)(eulerResult.tickCount * portTICK_PERIOD_MS)) / 1000);
+            sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(eulerResult.piValue, piReference));
 
-            lcdDrawString(fx32G, xpos+230, ypos, "Chudnovsky", color);
-            drawColoredPi__(fx24G, xpos+230, ypos+50, chudnovskyResult.piValue, piReference);
+            lcdDrawString(fx32G, xpos+230, ypos, "Euler", color);
+            drawColoredPi__(fx24G, xpos+230, ypos+50, eulerResult.piValue, piReference);
             lcdDrawString(fx24G, xpos+230, ypos+100, &displayTicks[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+150, &displayIterations[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+200, &displayTime[0], color);
             lcdDrawString(fx24G, xpos+230, ypos+250, &displayMathingDigits[0], color);
             lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, BLUE);
 
-            xQueueReset(chudnovskyQueue);
+            xQueueReset(eulerQueue);
         }
         lcdUpdateVScreen();
         vTaskDelay(10/portTICK_PERIOD_MS);
@@ -165,43 +165,25 @@ void leibnizTask(void* param) {
     }
 }
 
-void chudnovskyTask(void* param) {
+void eulerTask(void* param) {
     piResult_t piResult;
     
-    uint32_t k = 0;
-    long double sum = 0;
-    long double K = 6.0L;
-    long double M = 1.0L;
-    long double X = 1.0L;
-    long double L = 13591409.0L;
-    long double S = 13591409.0L;
+    uint32_t n = 1;
+    double sum = 0;
     
     vTaskDelay(100);
     
-    const long double C = 426880.0L * sqrtl(10005.0L);
-    const uint32_t MAX_ITERATIONS = 2;  //hard fix to make double not overflow
-    
     for(;;) {
-        if(k > 0 && k <= MAX_ITERATIONS) {
-            K += 12.0L;
-            M = M * (K*K*K - 16.0L*K) / ((k+1)*(k+1)*(k+1));
-            L += 545140134.0L;
-            X *= -262537412640768000.0L;
-            S += M * L / X;
-        }
+        sum += 1.0 / ((double)n * (double)n);
         
         piResult.tickCount = xTaskGetTickCount();
-        piResult.piValue = (double)(C / S);
-        piResult.iterations = k + 1;
-        printf("pi = %0.10f\n", piResult.piValue);
-        xQueueSendToFront(chudnovskyQueue, &piResult, 0);
+        piResult.piValue = sqrt(6.0 * sum);
+        piResult.iterations = n;
+        xQueueSendToFront(eulerQueue, &piResult, 0);
         
-        k++;
+        n++;
         
-        // Stop after reaching double precision limit
-        if(k > MAX_ITERATIONS) {
-            vTaskDelay(100);  // Just update display periodically
-        } else if(k % 10 == 0) {
+        if(n % 500 == 0) {
             vTaskDelay(1);
         } else {
             taskYIELD();
@@ -216,12 +198,12 @@ void app_main()
 
     piCalcEventGroup = xEventGroupCreate();
     leibnizQueue = xQueueCreate(100, sizeof(piResult_t));
-    chudnovskyQueue = xQueueCreate(100, sizeof(piResult_t));
+    eulerQueue = xQueueCreate(100, sizeof(piResult_t));
     
     //Create templateTask
     xTaskCreatePinnedToCore(controlTask, "controlTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(chudnovskyTask, "chudnovskyTask", 2*2048, NULL, 1, NULL, 1);
+    xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, NULL, 1);
 
     return;
 }
