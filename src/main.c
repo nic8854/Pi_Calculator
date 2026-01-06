@@ -25,6 +25,8 @@ typedef struct {
 
 const double piReference = 3.141592653589793238;
 
+uint8_t digitTarget = 6;
+
 EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
 QueueHandle_t eulerQueue;
@@ -88,6 +90,42 @@ void drawColoredPi__(const FontxFile *font, uint16_t x, uint16_t y, double calcu
     }
 }
 
+void inputTask(void* param) {
+    int32_t rotationChange = 0;
+    for(;;) {
+        if(button_get_state(SW0, true) == SHORT_PRESSED) {
+            led_set(LED0, 1);
+        } else {
+            led_set(LED0, 0);
+        }
+        if(button_get_state(SW1, true) == SHORT_PRESSED) {
+
+        }
+        if(button_get_state(SW2, true) == SHORT_PRESSED) {
+
+        }
+        if(button_get_state(SW3, true) == SHORT_PRESSED) {
+
+        }
+        rotationChange = rotary_encoder_get_rotation(true);
+        if(rotationChange != 0) {
+            if(rotationChange > 0) {
+                digitTarget ++;
+            } else {
+                digitTarget --;
+            }
+            if(digitTarget < 1) {
+                digitTarget = 1;
+            }
+            if(digitTarget > 10) {
+                digitTarget = 10;
+            }
+        }
+
+        vTaskDelay(100/portTICK_PERIOD_MS);
+    }
+}
+
 void controlTask(void* param) {
     piResult_t leibnizResult;
     piResult_t eulerResult;
@@ -104,7 +142,7 @@ void controlTask(void* param) {
             sprintf((char*)displayTicks, "Ticks = %d", (int)leibnizResult.tickCount);
             sprintf((char*)displayIterations, "Passes = %d", (int)leibnizResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(leibnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-            sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(leibnizResult.piValue, piReference));
+            sprintf((char*)displayMathingDigits, "Digits = %d / %d", checkPiDigits__(leibnizResult.piValue, piReference), digitTarget);
 
             lcdDrawString(fx32G, xpos, ypos, "Leibniz", color);
             drawColoredPi__(fx24G, xpos, ypos+50, leibnizResult.piValue, piReference);
@@ -120,7 +158,7 @@ void controlTask(void* param) {
             sprintf((char*)displayTicks, "Ticks = %d", (int)eulerResult.tickCount);
             sprintf((char*)displayIterations, "Passes = %d", (int)eulerResult.iterations);
             sprintf((char*)displayTime, "Time = %.3fs", ((float)(eulerResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-            sprintf((char*)displayMathingDigits, "Digits = %d", checkPiDigits__(eulerResult.piValue, piReference));
+            sprintf((char*)displayMathingDigits, "Digits = %d / %d", checkPiDigits__(eulerResult.piValue, piReference), digitTarget);
 
             lcdDrawString(fx32G, xpos+230, ypos, "Euler", color);
             drawColoredPi__(fx24G, xpos+230, ypos+50, eulerResult.piValue, piReference);
@@ -201,6 +239,7 @@ void app_main()
     eulerQueue = xQueueCreate(100, sizeof(piResult_t));
     
     //Create templateTask
+    xTaskCreatePinnedToCore(inputTask, "inputTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(controlTask, "controlTask", 2*2048, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(leibnizTask, "leibnizTask", 2*2048, NULL, 1, NULL, 1);
     xTaskCreatePinnedToCore(eulerTask, "eulerTask", 2*2048, NULL, 1, NULL, 1);
