@@ -27,9 +27,14 @@ const double piReference = 3.141592653589793238;
 
 uint8_t digitTarget = 6;
 
-EventGroupHandle_t piCalcEventGroup;
 QueueHandle_t leibnizQueue;
 QueueHandle_t eulerQueue;
+
+EventGroupHandle_t piCalcEventGroup;
+#define LEIBNIZ_START      (1 << 0)  // bit 0
+#define EULER_START         (1 << 1)  // bit 1
+#define RACE_START          (1 << 2)  // bit 2
+#define RESET               (1 << 5)  // bit 5
 
 int checkPiDigits__(double calculatedPi, double referencePi) {
     char calcStr[32];
@@ -92,20 +97,26 @@ void drawColoredPi__(const FontxFile *font, uint16_t x, uint16_t y, double calcu
 
 void inputTask(void* param) {
     int32_t rotationChange = 0;
+    uint32_t eventBits;
     for(;;) {
+        eventBits = xEventGroupGetBits(piCalcEventGroup);
         if(button_get_state(SW0, true) == SHORT_PRESSED) {
-            led_set(LED0, 1);
-        } else {
-            led_set(LED0, 0);
+            if(!(eventBits & EULER_START || eventBits & RACE_START)) {
+                xEventGroupSetBits(piCalcEventGroup, LEIBNIZ_START);
+            }
         }
         if(button_get_state(SW1, true) == SHORT_PRESSED) {
-
+            if(!(eventBits & LEIBNIZ_START || eventBits & RACE_START)) {
+                xEventGroupSetBits(piCalcEventGroup, EULER_START);
+            }
         }
         if(button_get_state(SW2, true) == SHORT_PRESSED) {
-
+            if(!(eventBits & LEIBNIZ_START || eventBits & EULER_START)) {
+                xEventGroupSetBits(piCalcEventGroup, RACE_START);
+            }
         }
         if(button_get_state(SW3, true) == SHORT_PRESSED) {
-
+            xEventGroupSetBits(piCalcEventGroup, RESET);
         }
         rotationChange = rotary_encoder_get_rotation(true);
         if(rotationChange != 0) {
@@ -129,6 +140,7 @@ void inputTask(void* param) {
 void controlTask(void* param) {
     piResult_t leibnizResult;
     piResult_t eulerResult;
+    EventBits_t eventBits;
     uint16_t xpos = 20;
 	uint16_t ypos = 50;
     char displayTicks[24];
@@ -137,6 +149,23 @@ void controlTask(void* param) {
     char displayMathingDigits[24];
 	uint16_t color = WHITE;
     for(;;) {
+        eventBits = xEventGroupGetBits(piCalcEventGroup);
+        if(eventBits & LEIBNIZ_START) {
+            led_set(LED0, 1);
+        }
+        if(eventBits & EULER_START) {
+            led_set(LED1, 1);
+        }
+        if(eventBits & RACE_START) {
+            led_set(LED2, 1);
+        }
+        if(eventBits & RESET) {
+            xEventGroupClearBits(piCalcEventGroup, LEIBNIZ_START | EULER_START  | RACE_START | RESET);
+            led_set(LED0, 0);
+            led_set(LED1, 0);
+            led_set(LED2, 0);
+        }
+
         lcdFillScreen(BLACK);
         if(xQueueReceive(leibnizQueue, &leibnizResult, portMAX_DELAY) == pdTRUE) {
             sprintf((char*)displayTicks, "Ticks = %d", (int)leibnizResult.tickCount);
@@ -182,7 +211,6 @@ void leibnizTask(void* param) {
     double sum = 0;
     double divisionValue = 0;
     vTaskDelay(100);
-
     for(;;) {
         divisionValue = 1.0 / (((double)iterator * 2.0) + 1.0);
         if(iterator % 2) {
