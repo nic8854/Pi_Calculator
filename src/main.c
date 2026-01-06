@@ -162,11 +162,11 @@ void controlTask(void* param) {
     char displayTicksLeibniz[24];
     char displayIterationsLeibniz[24];
     char displayTimeLeibniz[24];
-    char displayMathingDigitsLeibniz[24];
+    char displayMatchingDigitsLeibniz[24];
     char displayTicksEuler[24];
     char displayIterationsEuler[24];
     char displayTimeEuler[24];
-    char displayMathingDigitsEuler[24];
+    char displayMatchingDigitsEuler[24];
 	uint16_t color = WHITE;
     for(;;) {
         eventBits = xEventGroupGetBits(piCalcEventGroup);
@@ -258,32 +258,31 @@ void controlTask(void* param) {
         sprintf((char*)displayTicksLeibniz, "Ticks = %d", (int)leibnizResult.tickCount);
         sprintf((char*)displayIterationsLeibniz, "Passes = %d", (int)leibnizResult.iterations);
         sprintf((char*)displayTimeLeibniz, "Time = %.3fs", ((float)(leibnizResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-        sprintf((char*)displayMathingDigitsLeibniz, "Digits = %d / %d", checkPiDigits__(leibnizResult.piValue, piReference), digitTarget);
+        sprintf((char*)displayMatchingDigitsLeibniz, "Digits = %d / %d", leibnizDigits, digitTarget);
 
         lcdDrawString(fx32G, xpos, ypos, "Leibniz", color);
         drawColoredPi__(fx24G, xpos, ypos+50, leibnizResult.piValue, piReference);
         lcdDrawString(fx24G, xpos, ypos+100, &displayTicksLeibniz[0], color);
         lcdDrawString(fx24G, xpos, ypos+150, &displayIterationsLeibniz[0], color);
         lcdDrawString(fx24G, xpos, ypos+200, &displayTimeLeibniz[0], color);
-        lcdDrawString(fx24G, xpos, ypos+250, &displayMathingDigitsLeibniz[0], color);
+        lcdDrawString(fx24G, xpos, ypos+250, &displayMatchingDigitsLeibniz[0], color);
         lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, BLUE);
 
         sprintf((char*)displayTicksEuler, "Ticks = %d", (int)eulerResult.tickCount);
         sprintf((char*)displayIterationsEuler, "Passes = %d", (int)eulerResult.iterations);
         sprintf((char*)displayTimeEuler, "Time = %.3fs", ((float)(eulerResult.tickCount * portTICK_PERIOD_MS)) / 1000);
-        sprintf((char*)displayMathingDigitsEuler, "Digits = %d / %d", checkPiDigits__(eulerResult.piValue, piReference), digitTarget);
+        sprintf((char*)displayMatchingDigitsEuler, "Digits = %d / %d", eulerDigits, digitTarget);
 
         lcdDrawString(fx32G, xpos+230, ypos, "Euler", color);
         drawColoredPi__(fx24G, xpos+230, ypos+50, eulerResult.piValue, piReference);
         lcdDrawString(fx24G, xpos+230, ypos+100, &displayTicksEuler[0], color);
         lcdDrawString(fx24G, xpos+230, ypos+150, &displayIterationsEuler[0], color);
         lcdDrawString(fx24G, xpos+230, ypos+200, &displayTimeEuler[0], color);
-        lcdDrawString(fx24G, xpos+230, ypos+250, &displayMathingDigitsEuler[0], color);
+        lcdDrawString(fx24G, xpos+230, ypos+250, &displayMatchingDigitsEuler[0], color);
         lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, BLUE);
 
-            
         lcdUpdateVScreen();
-        vTaskDelay(50/portTICK_PERIOD_MS);
+        vTaskDelay(10/portTICK_PERIOD_MS);
     }
 }
 
