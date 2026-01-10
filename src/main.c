@@ -168,6 +168,7 @@ void controlTask(void* param) {
     char displayTimeEuler[24];
     char displayMatchingDigitsEuler[24];
 	uint16_t color = WHITE;
+
     for(;;) {
         eventBits = xEventGroupGetBits(piCalcEventGroup);
         if(eventBits & LEIBNIZ_START && !(eventBitsLast & LEIBNIZ_START)) {
@@ -266,7 +267,13 @@ void controlTask(void* param) {
         lcdDrawString(fx24G, xpos, ypos+150, &displayIterationsLeibniz[0], color);
         lcdDrawString(fx24G, xpos, ypos+200, &displayTimeLeibniz[0], color);
         lcdDrawString(fx24G, xpos, ypos+250, &displayMatchingDigitsLeibniz[0], color);
-        lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, BLUE);
+        if(leibnizDigits >= digitTarget) {
+            lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, GREEN);
+        } else if (leibnizDigits == 0) {
+            lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, BLUE);
+        } else {
+            lcdDrawRect(xpos-10, ypos+10, ypos+180, ypos+260, RED);
+        }
 
         sprintf((char*)displayTicksEuler, "Ticks = %d", (int)eulerResult.tickCount);
         sprintf((char*)displayIterationsEuler, "Passes = %d", (int)eulerResult.iterations);
@@ -279,7 +286,13 @@ void controlTask(void* param) {
         lcdDrawString(fx24G, xpos+230, ypos+150, &displayIterationsEuler[0], color);
         lcdDrawString(fx24G, xpos+230, ypos+200, &displayTimeEuler[0], color);
         lcdDrawString(fx24G, xpos+230, ypos+250, &displayMatchingDigitsEuler[0], color);
-        lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, BLUE);
+        if(eulerDigits >= digitTarget) {
+            lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, GREEN);
+        } else if (eulerDigits == 0) {
+            lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, BLUE);
+        } else {
+            lcdDrawRect(xpos+220, ypos+10, ypos+410, ypos+260, RED);
+        }
 
         lcdUpdateVScreen();
         vTaskDelay(10/portTICK_PERIOD_MS);
