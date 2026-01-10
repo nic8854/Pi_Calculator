@@ -126,17 +126,19 @@ void inputTask(void* param) {
             xEventGroupSetBits(piCalcEventGroup, RESET);
         }
         rotationChange = rotary_encoder_get_rotation(true);
-        if(rotationChange != 0) {
-            if(rotationChange > 0) {
-                digitTarget ++;
-            } else {
-                digitTarget --;
-            }
-            if(digitTarget < 1) {
-                digitTarget = 1;
-            }
-            if(digitTarget > 10) {
-                digitTarget = 10;
+        if(!(eventBits & LEIBNIZ_START || eventBits & EULER_START || eventBits & RACE_START)) {
+            if(rotationChange != 0) {
+                if(rotationChange > 0) {
+                    digitTarget ++;
+                } else {
+                    digitTarget --;
+                }
+                if(digitTarget < 1) {
+                    digitTarget = 1;
+                }
+                if(digitTarget > 10) {
+                    digitTarget = 10;
+                }
             }
         }
 
@@ -226,6 +228,8 @@ void controlTask(void* param) {
             eulerResult.piValue = 0.0;
             eulerResult.tickCount = 0;
             eulerDigits = 0;
+            
+            eventBits = xEventGroupGetBits(piCalcEventGroup);
         }
 
         eventBitsLast = eventBits;
